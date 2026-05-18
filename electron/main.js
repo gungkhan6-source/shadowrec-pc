@@ -608,7 +608,9 @@ ipcMain.handle('start-game-recording', async (event, options) => {
 
   const srcW = firstFrame.width
   const srcH = firstFrame.height
-  console.log(`✅ İlk frame: ${srcW}x${srcH}`)
+  // ⭐ Hook'tan gelen format: 0=BGRA, 1=RGBA
+  const srcPixFmt = firstFrame.pixelFormat === 1 ? 'rgba' : 'bgra'
+  console.log(`✅ İlk frame: ${srcW}x${srcH} (pixelFormat=${srcPixFmt})`)
 
 
   // 3. Output dosyasi
@@ -618,7 +620,7 @@ ipcMain.handle('start-game-recording', async (event, options) => {
   const ext = format === 'mkv' ? 'mkv' : 'mp4'
   const filename = path.join(folder, `ShadowRec_Game_${ts}.${ext}`)
   
-  // 4. FFmpeg başlat (bgra → H264 → MP4)
+  // 4. FFmpeg başlat (bgra/rgba → H264 → MP4)
   const ffmpegPath = getFFmpegPath()
   const targetFps = Math.min(Math.max(parseInt(fps) || 60, 24), 60)
   const nvenc = await checkNvenc()
@@ -629,7 +631,7 @@ ipcMain.handle('start-game-recording', async (event, options) => {
 
     '-y', '-hide_banner', '-loglevel', 'warning', '-stats',
     '-f', 'rawvideo',
-    '-pixel_format', 'bgra',
+    '-pixel_format', srcPixFmt,  // ⭐ Dinamik: bgra veya rgba
     '-video_size', `${srcW}x${srcH}`,
     '-framerate', String(targetFps),
     '-thread_queue_size', '4096',
