@@ -1,0 +1,13 @@
+{
+  "name": "wasapi-capture",
+  "version": "1.0.0",
+  "description": "Windows WASAPI Loopback Audio Capture for Node.js",
+  "main": "index.js",
+  "scripts": {
+    "build": "node-gyp configure build",
+    "rebuild": "node-gyp rebuild"
+  },
+  "dependencies": {
+    "node-addon-api": "^8.0.0"
+  }
+}

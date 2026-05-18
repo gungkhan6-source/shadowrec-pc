@@ -1,0 +1,65 @@
+{
+  "name": "shadowrec-pc",
+  "version": "1.0.0",
+  "description": "ShadowRec — Screen Recorder & Converter",
+  "main": "electron/main.js",
+  "scripts": {
+    "start": "concurrently \"npm run react-start\" \"wait-on http://localhost:3000 && electron .\"",
+    "react-start": "react-scripts start",
+    "build": "react-scripts build",
+    "electron-build": "npm run build && electron-builder",
+    "pack": "electron-builder --dir"
+  },
+  "dependencies": {
+    "electron-is-dev": "^2.0.0",
+    "react": "^18.2.0",
+    "react-dom": "^18.2.0",
+    "react-scripts": "5.0.1",
+    "wasapi-capture": "file:wasapi-capture"
+  },
+  "devDependencies": {
+    "concurrently": "^8.2.0",
+    "electron": "^28.0.0",
+    "electron-builder": "^24.6.0",
+    "wait-on": "^7.2.0"
+  },
+  "build": {
+    "appId": "com.shadowrec.pc",
+    "productName": "ShadowRec",
+    "win": {
+      "target": [
+        "nsis",
+        "appx"
+      ],
+      "icon": "public/icon.ico"
+    },
+    "appx": {
+      "applicationId": "ShadowRec",
+      "backgroundColor": "#070B12",
+      "displayName": "ShadowRec",
+      "identityName": "ShadowRec",
+      "publisher": "CN=ShadowRec",
+      "publisherDisplayName": "ShadowRec"
+    },
+    "files": [
+      "build/**/*",
+      "electron/**/*",
+      "node_modules/**/*"
+    ],
+    "extraResources": [
+      {
+        "from": "bin/",
+        "to": "bin/"
+      }
+    ]
+  },
+  "browserslist": {
+    "production": [
+      ">0.2%",
+      "not dead"
+    ],
+    "development": [
+      "last 1 chrome version"
+    ]
+  }
+}
