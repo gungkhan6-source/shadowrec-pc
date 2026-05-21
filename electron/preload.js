@@ -16,6 +16,9 @@ contextBridge.exposeInMainWorld('shadowRec', {
   isRecording:      () => ipcRenderer.invoke('is-recording'),
   onRecordingLog:   (cb) => ipcRenderer.on('recording-log', (_, d) => cb(d)),
 
+  // Phase 7: Otomatik oyun tespiti
+  enumGames: () => ipcRenderer.invoke('enum-games'),
+
   // Dosya/klasör
   selectFolder: () => ipcRenderer.invoke('select-folder'),
   selectFile:   () => ipcRenderer.invoke('select-file'),

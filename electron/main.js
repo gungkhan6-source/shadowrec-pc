@@ -5,7 +5,14 @@ const { spawn } = require('child_process')
 const fs = require('fs')
 const os = require('os')
 const wasapi = require('../wasapi-capture/index.js')
-const GAME_HOOK_DLL = 'F:\\game-capture\\hook\\build\\Release\\shadowrec_hook.dll'
+// ⭐ Hook DLL'leri ve Injector'lar - 64-bit ve 32-bit oyunlar için ayrı
+const GAME_HOOK_DLL_X64 = 'F:\\game-capture\\hook\\build\\Release\\shadowrec_hook.dll'
+const GAME_HOOK_DLL_X86 = 'F:\\game-capture\\hook\\build_x86\\Release\\shadowrec_hook.dll'
+const INJECTOR_X64       = 'F:\\game-capture\\hook\\build\\Release\\injector.exe'
+const INJECTOR_X86       = 'F:\\game-capture\\hook\\build_x86\\Release\\injector.exe'
+
+// Geriye dönük uyumluluk
+const GAME_HOOK_DLL = GAME_HOOK_DLL_X64
 
 // ⭐ NATIVE CAPTURE — DXGI tabanlı kendi capture modülümüz
 // Eski ddagrab/gdigrab oyunda frame üretmiyor, bu native modül çözüyor
@@ -563,6 +570,7 @@ ipcMain.handle('start-game-recording', async (event, options) => {
   const {
     processName,
     fps = 60,
+    quality = '1080p',     // ⭐ YENİ: 720p / 1080p / 1440p / 4K / native
     savePath,
     format = 'mp4',
     bitrate
@@ -572,22 +580,106 @@ ipcMain.handle('start-game-recording', async (event, options) => {
     return { success: false, error: 'Native capture modulu yuklenmedi' }  
   }
 
-  if (!fs.existsSync(GAME_HOOK_DLL)) {
-    return { success: false, error: 'Hook DLL bulunamadi: ' + GAME_HOOK_DLL }
+  // ⭐ Phase 8: Mimari tespit (32-bit / 64-bit)
+  let isWow64 = false
+  if (nativeCapture.getProcessArchitecture) {
+    const archInfo = nativeCapture.getProcessArchitecture(processName)
+    if (!archInfo.found) {
+      return { success: false, error: archInfo.error || 'Process bulunamadi: ' + processName }
+    }
+    isWow64 = !!archInfo.isWow64
+  }
+
+  // Doğru DLL ve injector'ı seç
+  const HOOK_DLL = isWow64 ? GAME_HOOK_DLL_X86 : GAME_HOOK_DLL_X64
+  const INJECTOR = isWow64 ? INJECTOR_X86 : INJECTOR_X64
+  const archLabel = isWow64 ? 'x86 (32-bit)' : 'x64 (64-bit)'
+
+  if (!fs.existsSync(HOOK_DLL)) {
+    return { success: false, error: `Hook DLL bulunamadi (${archLabel}): ` + HOOK_DLL }
   }
 
   console.log('═══════════════════════════════════════')
   console.log('🎮 GAME CAPTURE BAŞLATILIYOR')
   console.log(`   Process: ${processName}`)
-  console.log(`   DLL: ${GAME_HOOK_DLL}`)
+  console.log(`   Mimari:  ${archLabel}`)
+  console.log(`   DLL:     ${HOOK_DLL}`)
+  console.log(`   Yöntem:  ${isWow64 ? '32-bit injector.exe spawn' : 'native gameCaptureStart inject'}`)
   console.log('═══════════════════════════════════════')
-  
-  const startResult = nativeCapture.gameCaptureStart(processName, GAME_HOOK_DLL)
-  if (!startResult.success) {
-    return startResult
+
+  // 32-bit ise: harici injector.exe spawn et (cross-arch çünkü Electron 64-bit)
+  // 64-bit ise: native modülün kendi inject mantığı kullan
+  let injectedPid = 0
+  if (isWow64) {
+    // 32-bit injector.exe spawn — cross-architecture inject çözümü
+    if (!fs.existsSync(INJECTOR)) {
+      return { success: false, error: '32-bit injector.exe bulunamadi: ' + INJECTOR }
+    }
+    
+    const injResult = await new Promise((resolve) => {
+      const proc = spawn(INJECTOR, [processName, HOOK_DLL], {
+        windowsHide: true,
+      })
+      let stdout = ''
+      let stderr = ''
+      proc.stdout.on('data', d => { stdout += d.toString() })
+      proc.stderr.on('data', d => { stderr += d.toString() })
+      proc.on('close', (code) => {
+        // injector.exe stdout'unda "PID=XXXXX" pattern var
+        const pidMatch = stdout.match(/PID=(\d+)/)
+        const pid = pidMatch ? parseInt(pidMatch[1]) : 0
+        
+        // ⭐ Başarı kriteri:
+        // - exit code 0 VE "Injection tamamlandi" yazısı YA DA
+        // - PID bulundu (process erişildi) — exit code/encoding nedeniyle çıktı bozulmuş olabilir
+        //   Eğer T3 zaten inject edilmişse re-inject zararsız (LoadLibrary aynı DLL'i ikinci kez yüklemez).
+        const explicitSuccess = code === 0 && /Injection tamamlandi/i.test(stdout)
+        const pidFound = pid > 0 && /Process bulundu/i.test(stdout)
+        
+        resolve({
+          success: explicitSuccess || pidFound,
+          explicitSuccess,
+          pidFound,
+          pid,
+          stdout,
+          stderr,
+          code,
+        })
+      })
+      proc.on('error', (err) => {
+        resolve({ success: false, error: err.message, stdout, stderr })
+      })
+    })
+    
+    if (!injResult.success) {
+      return {
+        success: false,
+        error: '32-bit injector basarisiz oldu (code=' + injResult.code + '). ' +
+               'Stdout: ' + injResult.stdout.slice(-200)
+      }
+    }
+    
+    injectedPid = injResult.pid
+    if (injResult.explicitSuccess) {
+      console.log(`✅ 32-bit inject başarili (injector.exe), PID=${injectedPid}`)
+    } else {
+      console.log(`⚠️  32-bit inject (code=${injResult.code}) - PID bulundu (${injectedPid}), devam ediliyor (re-inject zararsız)`)
+    }
+    
+    // Native modülün SHM'ine bağlan ama inject YAPMASIN (zaten yapıldı)
+    const attachResult = nativeCapture.gameCaptureStart(processName, HOOK_DLL, true)
+    if (!attachResult.success) {
+      return { success: false, error: 'SHM attach basarisiz: ' + (attachResult.error || '?') }
+    }
+  } else {
+    // 64-bit: native modül kendi inject etsin
+    const startResult = nativeCapture.gameCaptureStart(processName, HOOK_DLL, false)
+    if (!startResult.success) {
+      return startResult
+    }
+    injectedPid = startResult.pid
+    console.log(`✅ 64-bit inject başarili (native), PID=${injectedPid}`)
   }
-  
-  console.log(`✅ Inject başarili, PID=${startResult.pid}`)
   
   // 2. İlk frame'i bekle (DLL hook kurulsun, boyutu öğren)
   await new Promise(r => setTimeout(r, 1500))
@@ -620,26 +712,66 @@ ipcMain.handle('start-game-recording', async (event, options) => {
   const ext = format === 'mkv' ? 'mkv' : 'mp4'
   const filename = path.join(folder, `ShadowRec_Game_${ts}.${ext}`)
   
-  // 4. FFmpeg başlat (bgra/rgba → H264 → MP4)
+  // 4. FFmpeg başlat (bgra/rgba → H264 → MP4/MKV)
   const ffmpegPath = getFFmpegPath()
   const targetFps = Math.min(Math.max(parseInt(fps) || 60, 24), 60)
   const nvenc = await checkNvenc()
-  const kbps = bitrate || 6000
+  
+  // ⭐ Hedef çözünürlük (UI'dan gelen quality)
+  // 'native' → oyunun kendi çözünürlüğü (scale yok)
+  // Diğerleri → fixed scale
+  const RES_MAP = {
+    '720p':  { w: 1280, h: 720  },
+    '1080p': { w: 1920, h: 1080 },
+    '1440p': { w: 2560, h: 1440 },
+    '4K':    { w: 3840, h: 2160 },
+    'native': null,  // scale yok
+  }
+  const targetRes = RES_MAP[quality] || RES_MAP['1080p']
+  const willScale = targetRes && (targetRes.w !== srcW || targetRes.h !== srcH)
+  const outW = targetRes ? targetRes.w : srcW
+  const outH = targetRes ? targetRes.h : srcH
+  
+  // ⭐ Kalite preset'i (bitrate) - quality + fps'e bağlı
+  // 4K@60 daha fazla bitrate gerektirir, 720p@30 daha az
+  let kbps = bitrate
+  if (!kbps) {
+    const QUALITY_BITRATE = {
+      '720p':  targetFps >= 60 ? 4500  : 3000,
+      '1080p': targetFps >= 60 ? 8000  : 5500,
+      '1440p': targetFps >= 60 ? 16000 : 10000,
+      '4K':    targetFps >= 60 ? 35000 : 22000,
+      'native': targetFps >= 60 ? 8000  : 5500,  // 1080p varsayım
+    }
+    kbps = QUALITY_BITRATE[quality] || 8000
+  }
+  
   const gop = targetFps * 2
+  
+  // ⭐ Video filter chain — fps cap + scale + format
+  // fps=N filter: girişten N FPS'ye düşürür (fazla frame'leri atar, eksik olanları korur)
+  // Bu wallclock_as_timestamps ile birleşince gerçek-zamanlı hız sağlar
+  const vfFilters = []
+  vfFilters.push(`fps=${targetFps}`)  // ⭐ ÖNCE fps cap (oyun 125 FPS verirse 60'a düşür)
+  if (willScale) {
+    vfFilters.push(`scale=${outW}:${outH}:flags=lanczos`)
+  }
+  vfFilters.push('format=yuv420p')
   
   const args = [ 
 
     '-y', '-hide_banner', '-loglevel', 'warning', '-stats',
+    '-use_wallclock_as_timestamps', '1',  // ⭐ Gerçek zamanlı timestamp (hız bozulmasını engeller)
     '-f', 'rawvideo',
     '-pixel_format', srcPixFmt,  // ⭐ Dinamik: bgra veya rgba
     '-video_size', `${srcW}x${srcH}`,
-    '-framerate', String(targetFps),
+    '-framerate', String(targetFps),  // input hint (claim)
     '-thread_queue_size', '4096',
     '-i', 'pipe:0',
     '-f', 'lavfi',
     '-i', 'anullsrc=channel_layout=stereo:sample_rate=48000',
     '-map', '0:v', '-map', '1:a',
-    '-vf', 'format=yuv420p',
+    '-vf', vfFilters.join(','),
   ]
 
   if (nvenc) {
@@ -666,7 +798,7 @@ ipcMain.handle('start-game-recording', async (event, options) => {
     filename
   )
   
-  console.log(`🎬 FFmpeg: ${srcW}x${srcH} @ ${targetFps}fps, ${kbps}k, encoder=${nvenc ? 'nvenc' : 'x264'}`)
+  console.log(`🎬 FFmpeg: ${srcW}x${srcH}${willScale ? ` → ${outW}x${outH} (${quality})` : ` (native)`} @ ${targetFps}fps, ${kbps}k, encoder=${nvenc ? 'nvenc' : 'x264'}`)
   
   recordingProcess = spawn(ffmpegPath, args, { stdio: ['pipe', 'pipe', 'pipe'] })
   recordingOutput = filename
@@ -1178,6 +1310,19 @@ ipcMain.handle('stop-recording', async () => {
 })
 
 ipcMain.handle('is-recording', () => recordingProcess !== null)
+
+// ⭐ Phase 7: Otomatik oyun tespiti
+ipcMain.handle('enum-games', () => {
+  if (!nativeCapture || !nativeCapture.enumGames) {
+    return { success: false, error: 'enumGames fonksiyonu yok', games: [] }
+  }
+  try {
+    const games = nativeCapture.enumGames()
+    return { success: true, games }
+  } catch (err) {
+    return { success: false, error: err.message, games: [] }
+  }
+})
 
 ipcMain.handle('open-file', async (_, filePath) => {
   await shell.openPath(filePath)

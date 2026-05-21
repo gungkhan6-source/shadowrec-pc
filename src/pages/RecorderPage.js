@@ -1,7 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react'
 
-const bgUrl = process.env.PUBLIC_URL + '/bg.png'
-
 const QUALITIES = ['720p', '1080p', '1440p', '4K']
 const FPS_OPT   = [30, 60]
 const FORMATS   = ['mp4', 'mkv']
@@ -25,8 +23,40 @@ export default function RecorderPage({ settings }) {
   const [gameProcess, setGameProcess] = useState('test_app.exe')
   const [gameStatus, setGameStatus]   = useState('idle')  // 'idle' | 'running' | 'error'
   const [gameInfo, setGameInfo]       = useState('')
+  
+  // ⭐ Phase 7: Otomatik oyun tespiti
+  const [detectedGames, setDetectedGames] = useState([])
+  const [selectedGame, setSelectedGame]   = useState(null)
+  const [showManual, setShowManual]       = useState(false)
+  
   const timerRef = useRef(null)
   const api = window.shadowRec
+
+  // ⭐ Phase 7: Otomatik oyun tarama (her 3 saniyede)
+  useEffect(() => {
+    let mounted = true
+    
+    const scan = async () => {
+      if (!api?.enumGames) return
+      try {
+        const result = await api.enumGames()
+        if (!mounted) return
+        if (result?.success && Array.isArray(result.games)) {
+          setDetectedGames(result.games)
+        }
+      } catch (e) {
+        console.error('enumGames error:', e)
+      }
+    }
+    
+    scan()  // İlk tarama
+    const interval = setInterval(scan, 3000)  // 3 saniyede bir
+    
+    return () => {
+      mounted = false
+      clearInterval(interval)
+    }
+  }, [api])
 
   // Kaynakları yükle
   useEffect(() => {
@@ -95,31 +125,35 @@ export default function RecorderPage({ settings }) {
       return
     }
 
-    if (!gameProcess || !gameProcess.trim()) {
+    // ⭐ Phase 7: Seçilen oyundan veya manuel input'tan process adı al
+    const processName = selectedGame?.exeName || gameProcess.trim()
+    
+    if (!processName) {
       setGameStatus('error')
-      setGameInfo('Process adı girin (örn: test_app.exe)')
+      setGameInfo('Bir oyun seçin veya manuel process adı girin')
       return
     }
 
     setGameStatus('running')
-    setGameInfo('Başlatılıyor (DLL inject)...')
+    setGameInfo(`Başlatılıyor: ${processName} (DLL inject)...`)
 
     // api.startGameRecording yoksa direkt ipcRenderer dene
     let result
     if (api?.startGameRecording) {
       result = await api.startGameRecording({
-        processName: gameProcess.trim(),
+        processName,
         fps,
+        quality,         // ⭐ YENİ: 720p/1080p/1440p/4K
         format,
         savePath: settings?.savePath,
       })
     } else if (window.require) {
-      // Preload yoksa direct require
       try {
         const { ipcRenderer } = window.require('electron')
         result = await ipcRenderer.invoke('start-game-recording', {
-          processName: gameProcess.trim(),
+          processName,
           fps,
+          quality,       // ⭐ YENİ
           format,
           savePath: settings?.savePath,
         })
@@ -307,15 +341,9 @@ export default function RecorderPage({ settings }) {
         gap:20, padding:24,
         position:'relative', overflow:'hidden',
       }}>
-        {/* PNG arka plan — tam alan */}
-        <div style={{
-          position:'absolute', inset:0,
-          backgroundImage:`url(${bgUrl})`,
-          backgroundSize:'100% 100%',
-          backgroundPosition:'center',
-          backgroundRepeat:'no-repeat',
-          zIndex:0,
-        }} />
+        {/* ⭐ Animated Inferno arka plan (bg.png yerine) */}
+        <div className="inferno-bg" />
+        <div className="inferno-sparks" />
         {/* Preview */}
         <div style={{
           width:'100%', maxWidth:640, aspectRatio:'16/9',
@@ -439,7 +467,7 @@ export default function RecorderPage({ settings }) {
           </div>
         )}
 
-        {/* ⭐ Game Capture - Phase 5 */}
+        {/* ⭐ Game Capture - Phase 5 + Phase 7 (Otomatik tespit) */}
         <div style={{
           background:'rgba(255,100,200,0.04)',
           border:'1px solid rgba(255,100,200,0.2)',
@@ -454,42 +482,156 @@ export default function RecorderPage({ settings }) {
             <div style={{
               fontSize:9, letterSpacing:2, color:'rgba(255,100,200,0.9)',
               fontFamily:'var(--font-display)', fontWeight:700,
-            }}>OYUN YAKALAMA (DLL INJECT)</div>
+            }}>OYUN YAKALAMA (OTOMATİK TESPİT)</div>
             <div style={{
               fontSize:8, color:'var(--text-dim)', marginLeft:'auto',
-            }}>Phase 5 • Fullscreen exclusive destekli</div>
+            }}>{detectedGames.length} oyun bulundu</div>
           </div>
 
-          <div style={{ display:'flex', gap:8, alignItems:'center' }}>
-            <input
-              type="text"
-              value={gameProcess}
-              onChange={e => setGameProcess(e.target.value)}
-              placeholder="örn: test_app.exe, game.exe"
-              disabled={isRecording}
-              style={{
-                flex:1,
-                background:'rgba(0,0,0,0.3)',
-                border:'1px solid rgba(255,100,200,0.2)',
-                borderRadius:6, padding:'7px 10px',
-                color:'var(--text)', fontSize:11,
-                outline:'none',
-              }}
-            />
-            <button onClick={handleGameCapture} style={{
-              background: isRecording
-                ? 'rgba(255,80,80,0.15)'
-                : 'rgba(255,100,200,0.15)',
-              border: `1px solid ${isRecording ? 'rgba(255,80,80,0.4)' : 'rgba(255,100,200,0.4)'}`,
-              borderRadius:6, padding:'7px 14px',
-              color: isRecording ? '#ff8080' : 'rgb(255,100,200)',
-              fontSize:11, fontWeight:600,
-              cursor:'pointer',
-              minWidth:130,
+          {/* Otomatik algılanan oyunlar listesi */}
+          {detectedGames.length > 0 ? (
+            <div style={{
+              display:'flex', flexDirection:'column', gap:6, marginBottom:10,
+              maxHeight:200, overflowY:'auto',
             }}>
-              {isRecording ? '⏹ Durdur' : '🎮 Yakala'}
+              {detectedGames.map(game => {
+                const isSelected = selectedGame?.pid === game.pid
+                return (
+                  <div
+                    key={game.pid}
+                    onClick={() => !isRecording && setSelectedGame(game)}
+                    style={{
+                      display:'flex', alignItems:'center', gap:10,
+                      padding:'8px 10px',
+                      background: isSelected
+                        ? 'rgba(255,100,200,0.15)'
+                        : 'rgba(0,0,0,0.25)',
+                      border: `1px solid ${isSelected ? 'rgba(255,100,200,0.5)' : 'rgba(255,255,255,0.05)'}`,
+                      borderRadius:6,
+                      cursor: isRecording ? 'not-allowed' : 'pointer',
+                      transition:'all 0.15s',
+                      opacity: isRecording && !isSelected ? 0.4 : 1,
+                    }}
+                  >
+                    <div style={{
+                      fontSize:18,
+                      filter: isSelected ? 'none' : 'grayscale(0.5)',
+                    }}>🎯</div>
+                    <div style={{ flex:1, minWidth:0 }}>
+                      <div style={{
+                        fontSize:12, fontWeight:600,
+                        color: isSelected ? 'rgb(255,150,210)' : 'var(--text)',
+                        whiteSpace:'nowrap', overflow:'hidden', textOverflow:'ellipsis',
+                      }}>
+                        {game.windowTitle || game.exeName}
+                      </div>
+                      <div style={{
+                        fontSize:9, color:'var(--text-dim)',
+                        whiteSpace:'nowrap', overflow:'hidden', textOverflow:'ellipsis',
+                      }}>
+                        {game.exeName} • {game.api} • {game.arch || (game.isWow64 ? 'x86' : 'x64')} • PID {game.pid}
+                      </div>
+                    </div>
+                    {isSelected && (
+                      <div style={{
+                        fontSize:9, color:'rgb(255,100,200)',
+                        background:'rgba(255,100,200,0.2)',
+                        padding:'2px 6px', borderRadius:4,
+                      }}>SEÇİLİ</div>
+                    )}
+                  </div>
+                )
+              })}
+            </div>
+          ) : (
+            <div style={{
+              padding:'12px 10px', marginBottom:10,
+              background:'rgba(0,0,0,0.2)',
+              border:'1px dashed rgba(255,255,255,0.1)',
+              borderRadius:6,
+              fontSize:11, color:'var(--text-dim)',
+              textAlign:'center',
+            }}>
+              Çalışan oyun bulunamadı. Bir oyun başlatın (DX9/11/12 veya OpenGL).
+            </div>
+          )}
+
+          {/* Manuel mod toggle */}
+          <div style={{
+            display:'flex', alignItems:'center', gap:8, marginBottom:10,
+          }}>
+            <button
+              onClick={() => setShowManual(!showManual)}
+              style={{
+                background:'transparent', border:'none',
+                color:'var(--text-dim)', fontSize:10,
+                cursor:'pointer', padding:0,
+              }}
+            >
+              {showManual ? '▼' : '▶'} Manuel process adı gir
             </button>
           </div>
+
+          {showManual && (
+            <div style={{ display:'flex', gap:6, marginBottom:10 }}>
+              <input
+                type="text"
+                value={gameProcess}
+                onChange={e => {
+                  setGameProcess(e.target.value)
+                  setSelectedGame(null)  // manuel girince selection iptal
+                }}
+                placeholder="örn: game.exe (otomatik bulunmuyorsa)"
+                disabled={isRecording}
+                style={{
+                  flex:1,
+                  background:'rgba(0,0,0,0.3)',
+                  border:'1px solid rgba(255,100,200,0.2)',
+                  borderRadius:6, padding:'7px 10px',
+                  color:'var(--text)', fontSize:11,
+                  outline:'none',
+                }}
+              />
+            </div>
+          )}
+
+          {/* Yakala / Durdur butonu */}
+          <button
+            onClick={handleGameCapture}
+            disabled={!isRecording && !selectedGame && !gameProcess.trim()}
+            style={{
+              width:'100%',
+              background: isRecording
+                ? 'rgba(255,80,80,0.15)'
+                : (!selectedGame && !gameProcess.trim())
+                  ? 'rgba(255,255,255,0.05)'
+                  : 'rgba(255,100,200,0.15)',
+              border: `1px solid ${
+                isRecording
+                  ? 'rgba(255,80,80,0.4)'
+                  : (!selectedGame && !gameProcess.trim())
+                    ? 'rgba(255,255,255,0.1)'
+                    : 'rgba(255,100,200,0.4)'
+              }`,
+              borderRadius:6, padding:'10px',
+              color: isRecording
+                ? '#ff8080'
+                : (!selectedGame && !gameProcess.trim())
+                  ? 'var(--text-dim)'
+                  : 'rgb(255,100,200)',
+              fontSize:12, fontWeight:600,
+              cursor: (!isRecording && !selectedGame && !gameProcess.trim()) ? 'not-allowed' : 'pointer',
+            }}
+          >
+            {isRecording
+              ? '⏹ Kaydı Durdur'
+              : selectedGame
+                ? `🎮 ${selectedGame.windowTitle || selectedGame.exeName} - Yakala`
+                : gameProcess.trim()
+                  ? `🎮 ${gameProcess.trim()} - Yakala (manuel)`
+                  : '🎮 Bir oyun seç'
+            }
+          </button>
 
           {gameInfo && (
             <div style={{

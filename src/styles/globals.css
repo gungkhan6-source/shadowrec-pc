@@ -38,6 +38,124 @@ body {
 ::-webkit-scrollbar-thumb { background: var(--border-hot); border-radius: 2px; }
 button { cursor: pointer; font-family: var(--font-body); }
 
+/* ═══════════════════════════════════════════════════════════════════
+   ⭐ ANIMATED INFERNO BG (bg.png yerine)
+   
+   bg.png yerine kullanılır. RecorderPage'de:
+     - <img src="bg.png" /> kaldırılır
+     - <div className="inferno-bg"></div> eklenir
+   
+   3 katmanlı:
+     1. Radial gradient (renk değişen merkezi parlaklık)
+     2. Linear gradient (yavaş dalga akışı)
+     3. Spark katmanı (kıvılcımlar)
+   ═══════════════════════════════════════════════════════════════════ */
+
+.inferno-bg {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  background: var(--bg-deep);
+  overflow: hidden;
+  pointer-events: none;  /* tıklamayı engelleme */
+}
+
+/* Katman 1: Köşelerden gelen renk değişen glow */
+.inferno-bg::before {
+  content: '';
+  position: absolute;
+  inset: -100px;
+  background:
+    radial-gradient(circle at 0% 0%,      rgba(0,200,255,0.35) 0%, transparent 35%),
+    radial-gradient(circle at 100% 0%,    rgba(123,47,255,0.35) 0%, transparent 35%),
+    radial-gradient(circle at 100% 100%,  rgba(255,68,204,0.35) 0%, transparent 40%),
+    radial-gradient(circle at 0% 100%,    rgba(255,106,0,0.30) 0%, transparent 40%);
+  filter: blur(40px);
+  animation: inferno-shift 12s ease-in-out infinite;
+}
+
+/* Katman 2: Hareket eden conic gradient */
+.inferno-bg::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: conic-gradient(
+    from 0deg at 50% 50%,
+    rgba(0,200,255,0.10) 0deg,
+    rgba(123,47,255,0.10) 60deg,
+    rgba(255,68,204,0.10) 120deg,
+    rgba(255,106,0,0.10) 180deg,
+    rgba(0,255,136,0.10) 240deg,
+    rgba(255,204,0,0.10) 300deg,
+    rgba(0,200,255,0.10) 360deg
+  );
+  filter: blur(60px);
+  animation: inferno-rotate 30s linear infinite;
+  mix-blend-mode: screen;
+}
+
+@keyframes inferno-shift {
+  0%, 100% {
+    transform: scale(1) rotate(0deg);
+    filter: blur(40px) hue-rotate(0deg);
+  }
+  25% {
+    transform: scale(1.08) rotate(2deg);
+    filter: blur(50px) hue-rotate(45deg);
+  }
+  50% {
+    transform: scale(1.12) rotate(-2deg);
+    filter: blur(45px) hue-rotate(90deg);
+  }
+  75% {
+    transform: scale(1.08) rotate(2deg);
+    filter: blur(50px) hue-rotate(45deg);
+  }
+}
+
+@keyframes inferno-rotate {
+  from { transform: rotate(0deg); }
+  to   { transform: rotate(360deg); }
+}
+
+/* Katman 3: Sparkle noktaları (rastgele kıvılcımlar) */
+.inferno-sparks {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  z-index: 1;
+}
+.inferno-sparks::before,
+.inferno-sparks::after {
+  content: '';
+  position: absolute;
+  width: 2px; height: 2px;
+  border-radius: 50%;
+  box-shadow:
+    20% 30% 0 1px rgba(0,200,255,0.8),
+    40% 70% 0 1px rgba(255,68,204,0.8),
+    60% 20% 0 1px rgba(255,204,0,0.8),
+    80% 60% 0 1px rgba(123,47,255,0.8),
+    30% 80% 0 1px rgba(0,255,136,0.8),
+    70% 40% 0 1px rgba(255,106,0,0.8),
+    50% 50% 0 1px rgba(0,200,255,0.8),
+    10% 60% 0 1px rgba(255,68,204,0.8),
+    90% 20% 0 1px rgba(255,204,0,0.8);
+  animation: spark-twinkle 4s ease-in-out infinite;
+}
+.inferno-sparks::after {
+  animation-delay: 2s;
+  opacity: 0.6;
+}
+
+@keyframes spark-twinkle {
+  0%, 100% { opacity: 0.3; }
+  50%      { opacity: 1; }
+}
+
+/* ═══════════════════════════════════════════════════════════════════
+   Mevcut renk animation'ları (değişmedi)
+   ═══════════════════════════════════════════════════════════════════ */
 @keyframes rb {
   0%   { color:#00c8ff; }
   14%  { color:#7b2fff; }
@@ -87,7 +205,6 @@ button { cursor: pointer; font-family: var(--font-body); }
   to   { opacity:1; transform:translateY(0); }
 }
 @keyframes blink { 50% { opacity:0; } }
-
 .rb       { animation: rb        5s linear infinite; }
 .rb-border{ animation: rb-border 5s linear infinite; border:1px solid; }
 .rb-bg    { animation: rb-bg     5s linear infinite; border:1px solid; }
