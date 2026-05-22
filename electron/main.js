@@ -4,7 +4,14 @@ const isDev = require('electron-is-dev')
 const { spawn } = require('child_process')
 const fs = require('fs')
 const os = require('os')
-const wasapi = require('../wasapi-capture/index.js')
+// wasapi-capture: opsiyonel native ses modülü (geliştirme aşamasında)
+// Eğer modül yüklenemezse uygulama yine de çalışmaya devam eder
+let wasapi = null
+try {
+  wasapi = require('../wasapi-capture/index.js')
+} catch (e) {
+  console.log('ℹ️  wasapi-capture yüklenmedi (opsiyonel):', e.message)
+}
 // ⭐ Hook DLL'leri ve Injector'lar - 64-bit ve 32-bit oyunlar için ayrı
 const GAME_HOOK_DLL_X64 = 'F:\\game-capture\\hook\\build\\Release\\shadowrec_hook.dll'
 const GAME_HOOK_DLL_X86 = 'F:\\game-capture\\hook\\build_x86\\Release\\shadowrec_hook.dll'
@@ -131,11 +138,25 @@ function createWindow() {
     backgroundColor: '#00000000',
     alwaysOnTop: false,
     skipTaskbar: false,
+    show: false,  // ⭐ Önce gizli, hazır olunca göster (boş ekran flicker önlenir)
     webPreferences: {
       nodeIntegration: false,
       contextIsolation: true,
       preload: path.join(__dirname, 'preload.js')
     }
+  })
+
+  // ⭐ HTML yüklendiğinde pencereyi göster
+  mainWindow.once('ready-to-show', () => {
+    mainWindow.show()
+    mainWindow.focus()
+  })
+  
+  // ⭐ Yükleme başarısız olursa logla (production debug için kritik)
+  mainWindow.webContents.on('did-fail-load', (event, errorCode, errorDescription, validatedURL) => {
+    console.error('❌ Pencere yüklenemedi:', errorCode, errorDescription, 'URL:', validatedURL)
+    mainWindow.show()  // hata olsa bile pencereyi göster ki kullanıcı görsün
+    mainWindow.webContents.openDevTools({ mode: 'detach' })
   })
 
   mainWindow.webContents.session.setDisplayMediaRequestHandler((request, callback) => {
@@ -706,11 +727,11 @@ ipcMain.handle('start-game-recording', async (event, options) => {
 
 
   // 3. Output dosyasi
-  const folder = savePath || path.join(os.homedir(), 'Videos', 'ShadowRec')
+  const folder = savePath || path.join(os.homedir(), 'Videos', 'NovaRec')
   if (!fs.existsSync(folder)) fs.mkdirSync(folder, { recursive: true })
   const ts = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19)
   const ext = format === 'mkv' ? 'mkv' : 'mp4'
-  const filename = path.join(folder, `ShadowRec_Game_${ts}.${ext}`)
+  const filename = path.join(folder, `NovaRec_Game_${ts}.${ext}`)
   
   // 4. FFmpeg başlat (bgra/rgba → H264 → MP4/MKV)
   const ffmpegPath = getFFmpegPath()
@@ -893,11 +914,11 @@ ipcMain.handle('start-recording', async (event, options) => {
       return await startNativeCapture(options, event, true, liveUrl)
     } else if (!isLive) {
       // Dosya kaydı
-      const folder = savePath || path.join(os.homedir(), 'Videos', 'ShadowRec')
+      const folder = savePath || path.join(os.homedir(), 'Videos', 'NovaRec')
       if (!fs.existsSync(folder)) fs.mkdirSync(folder, { recursive: true })
       const ts = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19)
       const ext = format === 'mkv' ? 'mkv' : 'mp4'
-      const filename = path.join(folder, `ShadowRec_${ts}.${ext}`)
+      const filename = path.join(folder, `NovaRec_${ts}.${ext}`)
       return await startNativeCapture(options, event, false, filename)
     }
   }
@@ -1201,12 +1222,12 @@ ipcMain.handle('start-recording', async (event, options) => {
   // ═══════════════════════════════════════════════════════════════
   // DOSYAYA KAYIT (NVENC burada açık kalıyor)
   // ═══════════════════════════════════════════════════════════════
-  const folder = savePath || path.join(os.homedir(), 'Videos', 'ShadowRec')
+  const folder = savePath || path.join(os.homedir(), 'Videos', 'NovaRec')
   if (!fs.existsSync(folder)) fs.mkdirSync(folder, { recursive: true })
 
   const ext = format === 'mkv' ? 'mkv' : 'mp4'
   const timestamp = new Date().toISOString().replace(/[:.]/g,'-').slice(0,19)
-  const outFile = path.join(folder, `ShadowRec_${timestamp}.${ext}`)
+  const outFile = path.join(folder, `NovaRec_${timestamp}.${ext}`)
   recordingOutput = outFile
 
   const targetFps = Math.min(Math.max(parseInt(fps) || 30, 24), 60)

@@ -1,17 +1,22 @@
 import React, { useState, useRef } from 'react'
+import { useLang } from '../i18n'
 
-const PRESETS = [
-  { id:'source',     label:'Kaynak',       emoji:'🔗', desc:'Orijinal boyut' },
-  { id:'shorts',     label:'Shorts/Reels', emoji:'📱', desc:'1080×1920 dikey' },
-  { id:'widescreen', label:'Widescreen',   emoji:'🎬', desc:'1920×1080' },
-  { id:'4k',         label:'4K UHD',       emoji:'✨', desc:'3840×2160' },
-  { id:'square',     label:'Square',       emoji:'⬜', desc:'1080×1080' },
-  { id:'720p',       label:'720p',         emoji:'⚡', desc:'1280×720' },
-]
 const FORMATS = ['MP4','MKV','WebM','GIF','MP3']
 const SPEEDS  = ['0.5×','1×','1.5×','2×']
 
 export default function ConverterPage() {
+  const { t } = useLang()
+  
+  // PRESETS - label ve desc i18n'den
+  const PRESETS = [
+    { id:'source',     label:t('preset_source'),  emoji:'🔗', desc:t('preset_source_desc') },
+    { id:'shorts',     label:t('preset_shorts'),  emoji:'📱', desc:t('preset_shorts_desc') },
+    { id:'widescreen', label:t('preset_wide'),    emoji:'🎬', desc:t('preset_wide_desc') },
+    { id:'4k',         label:t('preset_4k'),      emoji:'✨', desc:t('preset_4k_desc') },
+    { id:'square',     label:t('preset_square'),  emoji:'⬜', desc:t('preset_square_desc') },
+    { id:'720p',       label:t('preset_720p'),    emoji:'⚡', desc:t('preset_720p_desc') },
+  ]
+  
   const [inputFile, setInputFile] = useState(null)
   const [preset, setPreset]  = useState('widescreen')
   const [format, setFormat]  = useState('MP4')
@@ -21,7 +26,7 @@ export default function ConverterPage() {
   const [progress, setProgress] = useState(0)
   const [log, setLog]        = useState('')
   const dropRef = useRef()
-  const api = window.shadowRec
+  const api = window.novaRec
 
   const handleDrop = (e) => {
     e.preventDefault()
@@ -58,7 +63,7 @@ export default function ConverterPage() {
         display:'flex', flexDirection:'column', gap:12,
         overflowY:'auto',
       }}>
-        <SectionLabel>VIDEO SEÇ</SectionLabel>
+        <SectionLabel>{t('pick_video')}</SectionLabel>
 
         {/* Drop zone */}
         <div ref={dropRef}
@@ -85,16 +90,16 @@ export default function ConverterPage() {
             <>
               <div style={{ fontSize:28, opacity:0.4 }}>📂</div>
               <div style={{ fontSize:11, color:'var(--text-dim)', marginTop:6 }}>
-                Sürükle bırak veya tıkla
+                {t('drag_or_click')}
               </div>
               <div style={{ fontSize:10, color:'var(--text-dim)', opacity:0.5, marginTop:2 }}>
-                MP4, MKV, MOV, AVI...
+                {t('formats_hint')}
               </div>
             </>
           )}
         </div>
 
-        <SectionLabel>FORMAT</SectionLabel>
+        <SectionLabel>{t('format')}</SectionLabel>
         <div style={{ display:'flex', flexWrap:'wrap', gap:4 }}>
           {FORMATS.map(f => (
             <button key={f} onClick={() => setFormat(f)} style={{
@@ -108,7 +113,7 @@ export default function ConverterPage() {
           ))}
         </div>
 
-        <SectionLabel>HIZ</SectionLabel>
+        <SectionLabel>{t('speed')}</SectionLabel>
         <div style={{ display:'flex', gap:4 }}>
           {SPEEDS.map(s => (
             <button key={s} onClick={() => setSpeed(s)} style={{
@@ -128,7 +133,7 @@ export default function ConverterPage() {
           padding:'6px 0',
         }}>
           <span style={{ fontSize:12, color: mute ? 'var(--text)' : 'var(--text-dim)' }}>
-            🔇 Sessiz video
+            🔇 {t('mute_video')}
           </span>
           <div onClick={() => setMute(!mute)} style={{
             width:36, height:20, borderRadius:10,
@@ -152,7 +157,7 @@ export default function ConverterPage() {
         display:'flex', flexDirection:'column', gap:12,
         overflowY:'auto',
       }}>
-        <SectionLabel>ÇIKTI BOYUTU</SectionLabel>
+        <SectionLabel>{t('output_size')}</SectionLabel>
         <div style={{ display:'flex', flexDirection:'column', gap:4 }}>
           {PRESETS.map(p => (
             <button key={p.id} onClick={() => setPreset(p.id)} style={{
@@ -193,7 +198,7 @@ export default function ConverterPage() {
                 }} />
               </div>
               <div style={{ fontSize:10, color:'var(--text-dim)' }}>
-                İşleniyor... {progress}%
+                {t('processing')} {progress}%
               </div>
             </div>
           )}
@@ -204,7 +209,7 @@ export default function ConverterPage() {
               background:'rgba(0,255,136,0.08)',
               border:'1px solid rgba(0,255,136,0.3)',
               color:'var(--green)', fontSize:12,
-            }}>✅ Tamamlandı!</div>
+            }}>{t('completed')}</div>
           )}
 
           {status === 'error' && (
@@ -231,7 +236,7 @@ export default function ConverterPage() {
               cursor: !inputFile ? 'not-allowed' : 'pointer',
               transition:'all 0.2s',
             }}>
-            {status === 'running' ? '⏳ İŞLENİYOR...' : '⚡ CONVERT'}
+            {status === 'running' ? '⏳ ' + t('processing') : '⚡ ' + t('convert_btn')}
           </button>
         </div>
       </div>

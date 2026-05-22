@@ -1,10 +1,12 @@
 import React, { useState, useEffect, useRef } from 'react'
+import { useLang } from '../i18n'
 
 const QUALITIES = ['720p', '1080p', '1440p', '4K']
 const FPS_OPT   = [30, 60]
 const FORMATS   = ['mp4', 'mkv']
 
 export default function RecorderPage({ settings }) {
+  const { t } = useLang()
   const [isRecording, setIsRecording] = useState(false)
   const [seconds, setSeconds]         = useState(0)
   const [quality, setQuality]         = useState('1080p')
@@ -30,7 +32,7 @@ export default function RecorderPage({ settings }) {
   const [showManual, setShowManual]       = useState(false)
   
   const timerRef = useRef(null)
-  const api = window.shadowRec
+  const api = window.novaRec
 
   // ⭐ Phase 7: Otomatik oyun tarama (her 3 saniyede)
   useEffect(() => {
@@ -130,7 +132,7 @@ export default function RecorderPage({ settings }) {
     
     if (!processName) {
       setGameStatus('error')
-      setGameInfo('Bir oyun seçin veya manuel process adı girin')
+      setGameInfo(t('pick_game_or_manual'))
       return
     }
 
@@ -167,7 +169,7 @@ export default function RecorderPage({ settings }) {
     if (result?.success) {
       setIsRecording(true)
       setLastOutput(null)
-      setGameInfo(`✅ Yakalanıyor: ${result.width}x${result.height} @ ${result.fps}fps (${result.encoder})`)
+      setGameInfo(`✅ ${t('capturing')}: ${result.width}x${result.height} @ ${result.fps}fps (${result.encoder})`)
     } else {
       setGameStatus('error')
       setGameInfo('❌ ' + (result?.error || 'Bilinmeyen hata'))
@@ -187,11 +189,11 @@ export default function RecorderPage({ settings }) {
         display:'flex', flexDirection:'column', gap:10,
         overflowY:'auto', flexShrink:0,
       }}>
-        <SLabel>EKRAN KAYNAĞI</SLabel>
+        <SLabel>{t('screen_source')}</SLabel>
         <div style={{ display:'flex', flexDirection:'column', gap:4 }}>
           {sources.length === 0 && (
             <div style={{ color:'var(--text-dim)', fontSize:11, padding:'6px 0' }}>
-              Kaynaklar yükleniyor...
+              {t('sources_loading')}
             </div>
           )}
           {sources.map(src => (
@@ -215,23 +217,23 @@ export default function RecorderPage({ settings }) {
         </div>
 
         <div style={{ height:1, background:'rgba(0,200,255,0.06)', margin:'4px 0' }} />
-        <SLabel>KALİTE</SLabel>
+        <SLabel>{t('quality')}</SLabel>
         <SegCtrl options={QUALITIES} value={quality} onChange={setQuality} disabled={isRecording} />
 
-        <SLabel>FPS</SLabel>
+        <SLabel>{t('fps')}</SLabel>
         <SegCtrl options={FPS_OPT} value={fps} onChange={setFps} disabled={isRecording} />
 
-        <SLabel>FORMAT</SLabel>
+        <SLabel>{t('format')}</SLabel>
         <SegCtrl options={FORMATS} value={format} onChange={setFormat} disabled={isRecording} uppercase />
 
         <div style={{ height:1, background:'rgba(0,200,255,0.06)', margin:'4px 0' }} />
-        <SLabel>SES</SLabel>
-        <Toggle label="Mikrofon / Kulaklık" value={micOn} onChange={setMicOn} disabled={isRecording} />
+        <SLabel>{t('audio')}</SLabel>
+        <Toggle label={t('microphone')} value={micOn} onChange={setMicOn} disabled={isRecording} />
 
-        {/* Mikrofon & Bluetooth cihaz seçici */}
+        {/* Mic device selector */}
         {micOn && (
           <div style={{ display:'flex', flexDirection:'column', gap:6 }}>
-            <SLabel>MİKROFON & BLUETOOTH CİHAZLARI</SLabel>
+            <SLabel>{t('audio_device')}</SLabel>
             {micDevices.length === 0 ? (
               <div style={{
                 fontSize:10, color:'var(--text-dim)',
@@ -239,7 +241,7 @@ export default function RecorderPage({ settings }) {
                 background:'rgba(255,255,255,0.03)',
                 border:'1px solid rgba(255,255,255,0.06)',
               }}>
-                Cihaz bulunamadı — Windows ses ayarlarını kontrol edin
+                {t("no_devices")}
               </div>
             ) : (
               <div style={{ display:'flex', flexDirection:'column', gap:3 }}>
@@ -270,7 +272,7 @@ export default function RecorderPage({ settings }) {
                         </div>
                         {isBT && (
                           <div style={{ fontSize:8, color:'rgba(0,150,255,0.7)', marginTop:1 }}>
-                            BLUETOOTH — otomatik kalite düzeltme
+                            BLUETOOTH
                           </div>
                         )}
                       </div>
@@ -312,7 +314,7 @@ export default function RecorderPage({ settings }) {
 
         {/* Format & Klasör bilgisi */}
         <div style={{ height:1, background:'rgba(0,200,255,0.06)', margin:'4px 0' }} />
-        <SLabel>KAYIT BİLGİSİ</SLabel>
+        <SLabel>{t('record_info')}</SLabel>
         <div style={{
           background:'rgba(0,0,0,0.3)',
           border:'1px solid rgba(0,200,255,0.08)',
@@ -320,9 +322,9 @@ export default function RecorderPage({ settings }) {
           fontSize:10, color:'var(--text-dim)',
           display:'flex', flexDirection:'column', gap:4,
         }}>
-          <div>Format: <span style={{ color:'var(--cyan)' }}>{(settings?.format || 'mp4').toUpperCase()}</span></div>
+          <div>{t('format')}: <span style={{ color:'var(--cyan)' }}>{(settings?.format || 'mp4').toUpperCase()}</span></div>
           <div style={{ wordBreak:'break-all' }}>
-            Klasör: <span style={{ color:'var(--text-dim)', fontSize:9 }}>{settings?.savePath || 'Ayarlanmadı'}</span>
+            {t('folder_label')}: <span style={{ color:'var(--text-dim)', fontSize:9 }}>{settings?.savePath || t('not_set')}</span>
           </div>
         </div>
         <button onClick={openFolder} style={{
@@ -331,7 +333,7 @@ export default function RecorderPage({ settings }) {
           borderRadius:6, padding:'5px',
           color:'var(--text-dim)', fontSize:10,
           cursor:'pointer',
-        }}>📂 Kayıt klasörünü aç</button>
+        }}>📂 {t('open_folder')}</button>
       </div>
 
       {/* Sağ: Önizleme + REC — PNG arka plan */}
@@ -416,16 +418,16 @@ export default function RecorderPage({ settings }) {
             : '0 0 20px rgba(0,200,255,0.1)',
         }}>
           <span style={{ fontSize:26 }}>{isRecording ? '⏹' : '⏺'}</span>
-          <span>{isRecording ? 'DURDUR' : 'KAYIT'}</span>
+          <span>{isRecording ? t('stop_btn') : t('record_btn')}</span>
         </button>
 
         {/* Stats */}
         <div style={{ display:'flex', gap:12, zIndex:1 }}>
           {[
-            { l:'KALİTE',  v:quality },
-            { l:'FPS',     v:fps },
-            { l:'FORMAT',  v:(settings?.format || 'MP4').toUpperCase() },
-            { l:'SÜRE',    v:fmt(seconds) },
+            { l:t('quality'),  v:quality },
+            { l:t('fps'),      v:fps },
+            { l:t('format'),   v:(settings?.format || 'MP4').toUpperCase() },
+            { l:t('duration'), v:fmt(seconds) },
           ].map(s => (
             <div key={s.l} style={{
               background:'rgba(0,0,0,0.4)',
@@ -482,10 +484,10 @@ export default function RecorderPage({ settings }) {
             <div style={{
               fontSize:9, letterSpacing:2, color:'rgba(255,100,200,0.9)',
               fontFamily:'var(--font-display)', fontWeight:700,
-            }}>OYUN YAKALAMA (OTOMATİK TESPİT)</div>
+            }}>{t('game_capture_title')}</div>
             <div style={{
               fontSize:8, color:'var(--text-dim)', marginLeft:'auto',
-            }}>{detectedGames.length} oyun bulundu</div>
+            }}>{t('games_found', { n: detectedGames.length })}</div>
           </div>
 
           {/* Otomatik algılanan oyunlar listesi */}
@@ -537,7 +539,7 @@ export default function RecorderPage({ settings }) {
                         fontSize:9, color:'rgb(255,100,200)',
                         background:'rgba(255,100,200,0.2)',
                         padding:'2px 6px', borderRadius:4,
-                      }}>SEÇİLİ</div>
+                      }}>{t('selected_label')}</div>
                     )}
                   </div>
                 )
@@ -552,11 +554,11 @@ export default function RecorderPage({ settings }) {
               fontSize:11, color:'var(--text-dim)',
               textAlign:'center',
             }}>
-              Çalışan oyun bulunamadı. Bir oyun başlatın (DX9/11/12 veya OpenGL).
+              {t('no_games_running')}
             </div>
           )}
 
-          {/* Manuel mod toggle */}
+          {/* Manual mode toggle */}
           <div style={{
             display:'flex', alignItems:'center', gap:8, marginBottom:10,
           }}>
@@ -568,7 +570,7 @@ export default function RecorderPage({ settings }) {
                 cursor:'pointer', padding:0,
               }}
             >
-              {showManual ? '▼' : '▶'} Manuel process adı gir
+              {showManual ? '▼' : '▶'} {t('manual_process_toggle')}
             </button>
           </div>
 
@@ -579,9 +581,9 @@ export default function RecorderPage({ settings }) {
                 value={gameProcess}
                 onChange={e => {
                   setGameProcess(e.target.value)
-                  setSelectedGame(null)  // manuel girince selection iptal
+                  setSelectedGame(null)
                 }}
-                placeholder="örn: game.exe (otomatik bulunmuyorsa)"
+                placeholder="game.exe"
                 disabled={isRecording}
                 style={{
                   flex:1,
@@ -595,7 +597,7 @@ export default function RecorderPage({ settings }) {
             </div>
           )}
 
-          {/* Yakala / Durdur butonu */}
+          {/* Capture / Stop button */}
           <button
             onClick={handleGameCapture}
             disabled={!isRecording && !selectedGame && !gameProcess.trim()}
@@ -624,12 +626,12 @@ export default function RecorderPage({ settings }) {
             }}
           >
             {isRecording
-              ? '⏹ Kaydı Durdur'
+              ? '⏹ ' + t('stop_capture')
               : selectedGame
-                ? `🎮 ${selectedGame.windowTitle || selectedGame.exeName} - Yakala`
+                ? `🎮 ${selectedGame.windowTitle || selectedGame.exeName} - ${t('capture_label')}`
                 : gameProcess.trim()
-                  ? `🎮 ${gameProcess.trim()} - Yakala (manuel)`
-                  : '🎮 Bir oyun seç'
+                  ? `🎮 ${gameProcess.trim()} - ${t('capture_manual')}`
+                  : '🎮 ' + t('pick_a_game')
             }
           </button>
 

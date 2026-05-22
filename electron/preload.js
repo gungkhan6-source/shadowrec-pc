@@ -1,6 +1,9 @@
 const { contextBridge, ipcRenderer } = require('electron')
 
-contextBridge.exposeInMainWorld('shadowRec', {
+// NovaRec Studio - Renderer ⇄ Main köprüsü
+// API hem window.novaRec hem window.shadowRec olarak expose edilir (geriye uyumluluk)
+
+const api = {
   // Pencere
   minimize:  () => ipcRenderer.send('window-minimize'),
   maximize:  () => ipcRenderer.send('window-maximize'),
@@ -32,4 +35,10 @@ contextBridge.exposeInMainWorld('shadowRec', {
   // Settings kaydet/yükle
   saveSetting: (key, val) => ipcRenderer.invoke('save-setting', key, val),
   loadSetting: (key, def) => ipcRenderer.invoke('load-setting', key, def),
-})
+}
+
+// Yeni isim (önerilen)
+contextBridge.exposeInMainWorld('novaRec', api)
+// Eski isim (geriye uyumluluk için)
+contextBridge.exposeInMainWorld('shadowRec', api)
+

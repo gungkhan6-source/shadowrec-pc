@@ -1,13 +1,16 @@
 import React from 'react'
-
-const NAV = [
-  { id:'recorder',  icon:'⏺', label:'REC' },
-  { id:'converter', icon:'⚡', label:'CNV' },
-  { id:'live',      icon:'📡', label:'LIVE' },
-  { id:'settings',  icon:'⚙',  label:'SET' },
-]
+import { useLang } from '../i18n'
 
 export default function Sidebar({ current, onChange }) {
+  const { t } = useLang()
+  
+  const NAV = [
+    { id:'recorder',  icon:'⏺', label: t('nav_recorder'),  title: t('nav_recorder_full') },
+    { id:'converter', icon:'⚡', label: t('nav_converter'), title: t('nav_converter_full') },
+    { id:'live',      icon:'📡', label: t('nav_live'),      title: t('nav_live_full') },
+    { id:'settings',  icon:'⚙',  label: t('nav_settings'),  title: t('nav_settings_full') },
+  ]
+  
   return (
     <div style={{
       width:72, background:'rgba(0,0,0,0.5)',
@@ -18,7 +21,7 @@ export default function Sidebar({ current, onChange }) {
       {NAV.map(item => {
         const active = current === item.id
         return (
-          <button key={item.id} onClick={() => onChange(item.id)} title={item.label}
+          <button key={item.id} onClick={() => onChange(item.id)} title={item.title}
             className={active ? 'rb-bg' : ''}
             style={{
               width:52, height:52,

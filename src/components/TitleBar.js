@@ -1,7 +1,8 @@
 import React from 'react'
 
 export default function TitleBar() {
-  const api = window.shadowRec
+  // ⭐ Geriye dönük uyumluluk: window.novaRec varsa onu, yoksa window.shadowRec'i kullan
+  const api = window.novaRec || window.shadowRec
   return (
     <div style={{
       height:40, display:'flex', alignItems:'center',
@@ -12,15 +13,22 @@ export default function TitleBar() {
     }} className="rb-border">
       <div style={{ display:'flex', alignItems:'center', gap:10 }}>
         <div style={{
-          width:20, height:20,
-          background:'linear-gradient(135deg, #00c8ff, #9b5cf6)',
+          width:22, height:22,
+          background:'linear-gradient(135deg, #00c8ff, #9b5cf6, #ff44cc)',
           clipPath:'polygon(50% 0%,100% 50%,50% 100%,0% 50%)',
+          boxShadow:'0 0 12px rgba(155,92,246,0.5)',
         }} />
         <span className="rb" style={{
-          fontFamily:'var(--font-display)', fontSize:13,
-          fontWeight:700, letterSpacing:3,
-        }}>SHADOWREC</span>
-        <span style={{ fontSize:9, color:'var(--text-dim)', letterSpacing:2 }}>v1.0</span>
+          fontFamily:'var(--font-display)', fontSize:14,
+          fontWeight:900, letterSpacing:3,
+        }}>NOVAREC</span>
+        <span style={{
+          fontFamily:'var(--font-display)', fontSize:11,
+          fontWeight:400, letterSpacing:4,
+          color:'var(--text-dim)',
+          marginLeft:-4,
+        }}>STUDIO</span>
+        <span style={{ fontSize:9, color:'var(--text-dim)', letterSpacing:2, marginLeft:6 }}>v1.0</span>
       </div>
       <div style={{ display:'flex', gap:8, WebkitAppRegion:'no-drag' }}>
         {[

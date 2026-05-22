@@ -1,14 +1,19 @@
 import React, { useState, useEffect } from 'react'
+import { useLang } from '../i18n'
 
-const PLATFORMS = [
-  { id:'youtube', label:'YouTube',  color:'#ff0000', icon:'▶', rtmp:'rtmp://a.rtmp.youtube.com/live2/' },
-  { id:'twitch',  label:'Twitch',   color:'#9146ff', icon:'◈', rtmp:'rtmp://live.twitch.tv/app/' },
-  { id:'custom',  label:'Özel RTMP',color:'#00c8ff', icon:'⚡', rtmp:'' },
-]
 const QUALITIES = ['720p 30fps','1080p 30fps','1080p 60fps','1440p 60fps']
 const BITRATES  = ['2500','4000','6000','8000','12000']
 
 export default function LivePage() {
+  const { t } = useLang()
+  
+  // PLATFORMS - "Custom RTMP" label çevirilebilir
+  const PLATFORMS = [
+    { id:'youtube', label:'YouTube',         color:'#ff0000', icon:'▶', rtmp:'rtmp://a.rtmp.youtube.com/live2/' },
+    { id:'twitch',  label:'Twitch',          color:'#9146ff', icon:'◈', rtmp:'rtmp://live.twitch.tv/app/' },
+    { id:'custom',  label:t('custom_rtmp'),  color:'#00c8ff', icon:'⚡', rtmp:'' },
+  ]
+  
   const [platform, setPlatform]   = useState('youtube')
   const [streamKey, setStreamKey] = useState('')
   const [customRtmp, setCustomRtmp] = useState('')
@@ -22,7 +27,7 @@ export default function LivePage() {
   const [viewers, setViewers]     = useState(0)
   const [log, setLog]             = useState('')
   const [showKey, setShowKey]     = useState(false)
-  const api = window.shadowRec
+  const api = window.novaRec
 
   useEffect(() => {
     api?.getAudioDevices?.().then(devices => {
@@ -58,8 +63,8 @@ export default function LivePage() {
   const fullUrl = rtmpUrl + streamKey
 
   const handleGoLive = async () => {
-    if (!streamKey && platform !== 'custom') return alert('Stream key gerekli!')
-    if (platform === 'custom' && !customRtmp) return alert('RTMP adresi gerekli!')
+    if (!streamKey && platform !== 'custom') return alert(t('stream_key_required'))
+    if (platform === 'custom' && !customRtmp) return alert(t('rtmp_required'))
     const [q, fps] = quality.split(' ')
     const result = await api?.startRecording?.({
       quality: q, fps: parseInt(fps), format:'mp4',
@@ -88,7 +93,7 @@ export default function LivePage() {
         display:'flex', flexDirection:'column', gap:10,
         overflowY:'auto', flexShrink:0,
       }}>
-        <SLabel>PLATFORM</SLabel>
+        <SLabel>{t('platform')}</SLabel>
         <div style={{ display:'flex', flexDirection:'column', gap:4 }}>
           {PLATFORMS.map(p => (
             <button key={p.id} onClick={() => !isLive && setPlatform(p.id)}
@@ -113,10 +118,10 @@ export default function LivePage() {
           ))}
         </div>
 
-        {/* Özel RTMP */}
+        {/* Custom RTMP */}
         {platform === 'custom' && (
           <>
-            <SLabel>RTMP ADRESİ</SLabel>
+            <SLabel>{t('rtmp_address')}</SLabel>
             <input value={customRtmp} onChange={e => setCustomRtmp(e.target.value)}
               placeholder="rtmp://..."
               disabled={isLive}
@@ -131,7 +136,7 @@ export default function LivePage() {
         {/* Stream Key */}
         {platform !== 'custom' && (
           <>
-            <SLabel>STREAM KEY</SLabel>
+            <SLabel>{t('stream_key')}</SLabel>
             <div style={{ position:'relative' }}>
               <input
                 type={showKey ? 'text' : 'password'}
@@ -152,13 +157,13 @@ export default function LivePage() {
                 }}>{showKey ? '🙈' : '👁'}</button>
             </div>
             <div style={{ fontSize:9, color:'var(--text-dim)', opacity:0.6 }}>
-              {platform==='youtube' ? 'YouTube Studio → Canlı Yayın → Stream Key' : 'Twitch Dashboard → Ayarlar → Stream Key'}
+              {platform==='youtube' ? t('stream_key_yt') : t('stream_key_tw')}
             </div>
           </>
         )}
 
         <div style={{ height:1, background:'rgba(0,200,255,0.06)' }} />
-        <SLabel>KALİTE</SLabel>
+        <SLabel>{t('quality')}</SLabel>
         <div style={{ display:'flex', flexDirection:'column', gap:3 }}>
           {QUALITIES.map(q => (
             <button key={q} onClick={() => !isLive && setQuality(q)}
@@ -174,7 +179,7 @@ export default function LivePage() {
           ))}
         </div>
 
-        <SLabel>VİDEO BİTRATE (kbps)</SLabel>
+        <SLabel>{t('video_bitrate')}</SLabel>
         <div style={{ display:'flex', gap:4, flexWrap:'wrap' }}>
           {BITRATES.map(b => (
             <button key={b} onClick={() => !isLive && setBitrate(b)}
@@ -190,10 +195,10 @@ export default function LivePage() {
         </div>
 
         <div style={{ height:1, background:'rgba(0,200,255,0.06)' }} />
-        <Toggle label="Mikrofon" value={micOn} onChange={setMicOn} disabled={isLive} />
+        <Toggle label={t('microphone')} value={micOn} onChange={setMicOn} disabled={isLive} />
         {micOn && micDevices.length > 0 && (
   <>
-    <SLabel>SES CİHAZI</SLabel>
+    <SLabel>{t('audio_device')}</SLabel>
     <div style={{ display:'flex', flexDirection:'column', gap:3 }}>
       {micDevices.map(d => {
         const name = typeof d === 'object' ? d.name : d
@@ -246,7 +251,7 @@ export default function LivePage() {
           {isLive && (
             <div style={{ display:'flex', alignItems:'center', gap:8, justifyContent:'center', marginTop:8 }}>
               <div style={{ width:10, height:10, borderRadius:'50%', background:'#ff4455', animation:'pulse-red 1s infinite' }} />
-              <span style={{ fontFamily:'var(--font-display)', fontSize:14, color:'#ff4455' }}>CANLI</span>
+              <span style={{ fontFamily:'var(--font-display)', fontSize:14, color:'#ff4455' }}>{t('on_air')}</span>
             </div>
           )}
         </div>
@@ -255,9 +260,9 @@ export default function LivePage() {
         {isLive && (
           <div style={{ display:'flex', gap:16, zIndex:1 }}>
             {[
-              { l:'SÜRE',   v:fmt(seconds),       c:'#00c8ff' },
-              { l:'KALİTE', v:quality,             c:'#9b5cf6' },
-              { l:'BİTRATE',v:bitrate+'k',         c:'#ff8c00' },
+              { l:t('duration'), v:fmt(seconds),       c:'#00c8ff' },
+              { l:t('quality'),  v:quality,             c:'#9b5cf6' },
+              { l:t('bitrate'),  v:bitrate+'k',         c:'#ff8c00' },
             ].map(s => (
               <div key={s.l} style={{
                 background:'rgba(0,0,0,0.6)',
@@ -271,7 +276,7 @@ export default function LivePage() {
           </div>
         )}
 
-        {/* Go Live butonu */}
+        {/* Go Live button */}
         <button onClick={isLive ? handleStop : handleGoLive}
           className={isLive ? '' : 'rb-border'}
           style={{
@@ -285,7 +290,7 @@ export default function LivePage() {
             cursor:'pointer', transition:'all 0.3s',
             animation: isLive ? 'pulse-red 2s infinite' : undefined,
           }}>
-          {isLive ? '⏹ DURDUR' : '📡 CANLI YAY'}
+          {isLive ? '⏹ ' + t('stop_live') : '📡 ' + t('go_live')}
         </button>
 
         {/* Log */}

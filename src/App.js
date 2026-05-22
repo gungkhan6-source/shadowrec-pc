@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react'
+import { LangProvider } from './i18n'
 import TitleBar from './components/TitleBar'
 import Sidebar from './components/Sidebar'
 import RecorderPage from './pages/RecorderPage'
@@ -6,10 +7,10 @@ import ConverterPage from './pages/ConverterPage'
 import SettingsPage from './pages/SettingsPage'
 import LivePage from './pages/LivePage'
 
-export default function App() {
+function AppContent() {
   const [page, setPage] = useState('recorder')
   const [settings, setSettings] = useState({
-    savePath: 'C:\\Videos\\ShadowRec',
+    savePath: 'C:\\Videos\\NovaRec',
     format: 'mp4',
     gpu: true,
   })
@@ -17,9 +18,9 @@ export default function App() {
   // Ayarları başlangıçta yükle
   useEffect(() => {
     const load = async () => {
-      const api = window.shadowRec
+      const api = window.novaRec || window.shadowRec
       if (!api) return
-      const savePath = await api.loadSetting('savePath', 'C:\\Videos\\ShadowRec')
+      const savePath = await api.loadSetting('savePath', 'C:\\Videos\\NovaRec')
       const format   = await api.loadSetting('format', 'mp4')
       const gpu      = await api.loadSetting('gpu', true)
       setSettings({ savePath, format, gpu })
@@ -44,5 +45,13 @@ export default function App() {
         </main>
       </div>
     </div>
+  )
+}
+
+export default function App() {
+  return (
+    <LangProvider>
+      <AppContent />
+    </LangProvider>
   )
 }

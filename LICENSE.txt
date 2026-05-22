@@ -1,0 +1,75 @@
+NovaRec Studio
+Copyright (C) 2026 NovaRec Studio Project
+
+================================================================================
+                    GNU GENERAL PUBLIC LICENSE
+                       Version 3, 29 June 2007
+================================================================================
+
+NovaRec Studio is free software: you can redistribute it and/or modify it
+under the terms of the GNU General Public License as published by the Free
+Software Foundation, either version 3 of the License, or (at your option)
+any later version.
+
+NovaRec Studio is distributed in the hope that it will be useful, but
+WITHOUT ANY WARRANTY; without even the implied warranty of MERCHANTABILITY
+or FITNESS FOR A PARTICULAR PURPOSE. See the GNU General Public License
+for more details.
+
+You should have received a copy of the GNU General Public License along
+with this program. If not, see <https://www.gnu.org/licenses/gpl-3.0.html>.
+
+================================================================================
+                          THIRD-PARTY COMPONENTS
+================================================================================
+
+This software includes the following third-party components:
+
+  - Electron       (MIT License) — https://www.electronjs.org/
+  - React          (MIT License) — https://reactjs.org/
+  - FFmpeg         (LGPL/GPL)    — https://ffmpeg.org/
+  - MinHook        (BSD-2)       — https://github.com/TsudaKageyu/minhook
+  - Node.js        (MIT License) — https://nodejs.org/
+
+Each component is distributed under its own license terms.
+
+================================================================================
+                            ADMINISTRATOR PRIVILEGES
+================================================================================
+
+NovaRec Studio requires administrator privileges to function correctly.
+This is needed for:
+
+  - DLL injection into game processes (game capture feature)
+  - Reading process modules and memory for graphics API detection
+  - Creating shared memory regions for frame transfer
+  - Accessing system audio devices via WASAPI
+
+NovaRec Studio does not modify any game files, does not send data to remote
+servers without your consent, and does not use anti-cheat bypass techniques.
+The software is designed for legitimate recording and streaming purposes only.
+
+================================================================================
+                            ANTI-CHEAT WARNING
+================================================================================
+
+Some online games employ anti-cheat systems (Easy Anti-Cheat, BattlEye, vgc,
+Vanguard, etc.) that may flag DLL injection as suspicious behavior. Using
+NovaRec Studio's game capture feature in such games may result in account
+suspension or bans.
+
+NovaRec Studio is intended for use with:
+  - Single-player games
+  - Games without active anti-cheat
+  - Game development testing
+  - Personal streaming and content creation
+
+The user assumes all responsibility for any consequences arising from the use
+of NovaRec Studio with online games.
+
+================================================================================
+
+By installing or using NovaRec Studio, you agree to the terms above.
+
+For the full GNU General Public License v3 text, please visit:
+https://www.gnu.org/licenses/gpl-3.0.en.html

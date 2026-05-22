@@ -1,7 +1,9 @@
 import React, { useState, useEffect } from 'react'
+import { useLang, LANGUAGES } from '../i18n'
 
 export default function SettingsPage({ onSettingsChange }) {
-  const api = window.shadowRec
+  const api = window.novaRec || window.shadowRec
+  const { lang, setLang, t } = useLang()
   const [tab, setTab] = useState('recording')
 
   // Kayıt ayarları
@@ -28,23 +30,24 @@ export default function SettingsPage({ onSettingsChange }) {
   const [saved, setSaved] = useState(false)
 
   const TABS = [
-    { id:'recording', label:'KAYIT' },
-    { id:'stream',    label:'YAYIN' },
-    { id:'audio',     label:'SES' },
-    { id:'about',     label:'HAKKINDA' },
+    { id:'recording', label: t('tab_recording') },
+    { id:'stream',    label: t('tab_stream') },
+    { id:'audio',     label: t('tab_audio') },
+    { id:'language',  label: t('tab_language') },
+    { id:'about',     label: t('tab_about') },
   ]
 
   const TWITCH_SERVERS = [
-    { id:'live.twitch.tv',         label:'Otomatik (Önerilen)' },
+    { id:'live.twitch.tv',         label:'Auto (Recommended)' },
     { id:'live-fra.twitch.tv',     label:'Frankfurt, DE' },
     { id:'live-ams.twitch.tv',     label:'Amsterdam, NL' },
-    { id:'live-lhr.twitch.tv',     label:'Londra, UK' },
+    { id:'live-lhr.twitch.tv',     label:'London, UK' },
   ]
 
   useEffect(() => {
     const load = async () => {
       if (!api) return
-      setSavePath(await api.loadSetting('savePath','C:\\Videos\\ShadowRec') || '')
+      setSavePath(await api.loadSetting('savePath','C:\\Videos\\NovaRec') || '')
       setFormat(await api.loadSetting('format','mp4') || 'mp4')
       setGpu(await api.loadSetting('gpu', true))
       setYtKey(await api.loadSetting('ytKey','') || '')
@@ -89,29 +92,29 @@ export default function SettingsPage({ onSettingsChange }) {
         borderBottom:'1px solid rgba(0,200,255,0.08)',
         flexShrink:0,
       }}>
-        {TABS.map(t => (
-          <button key={t.id} onClick={() => setTab(t.id)}
-            className={tab===t.id ? 'rb-border' : ''}
+        {TABS.map(tabItem => (
+          <button key={tabItem.id} onClick={() => setTab(tabItem.id)}
+            className={tab===tabItem.id ? 'rb-border' : ''}
             style={{
               padding:'6px 16px',
-              background: tab===t.id ? 'rgba(0,200,255,0.08)' : 'transparent',
-              border: tab===t.id ? undefined : '1px solid transparent',
+              background: tab===tabItem.id ? 'rgba(0,200,255,0.08)' : 'transparent',
+              border: tab===tabItem.id ? undefined : '1px solid transparent',
               borderRadius:'6px 6px 0 0',
-              color: tab===t.id ? 'var(--cyan)' : 'var(--text-dim)',
+              color: tab===tabItem.id ? 'var(--cyan)' : 'var(--text-dim)',
               fontFamily:'var(--font-display)', fontSize:9, letterSpacing:2,
               cursor:'pointer', transition:'all 0.15s',
-            }}>{t.label}</button>
+            }}>{tabItem.label}</button>
         ))}
       </div>
 
       {/* İçerik */}
       <div style={{ flex:1, overflowY:'auto', padding:20 }}>
 
-        {/* KAYIT AYARLARI */}
+        {/* RECORDING SETTINGS */}
         {tab === 'recording' && (
           <div style={{ display:'flex', flexDirection:'column', gap:14, maxWidth:560 }}>
-            <SGroup title="KAYIT KLASÖRÜ">
-              <SRow label="Kayıt klasörü" desc="Videoların kaydedileceği yer">
+            <SGroup title={t('section_save_folder')}>
+              <SRow label={t('record_folder')} desc={t('record_folder_desc')}>
                 <div style={{ display:'flex', gap:6, flex:1 }}>
                   <div style={{
                     flex:1, background:'rgba(0,0,0,0.5)',
@@ -119,15 +122,15 @@ export default function SettingsPage({ onSettingsChange }) {
                     borderRadius:7, padding:'6px 10px',
                     fontSize:11, color:'var(--text-dim)',
                     overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap',
-                  }}>{savePath || 'Seçilmedi'}</div>
-                  <CyBtn onClick={async () => { const f = await api?.selectFolder(); if(f) setSavePath(f) }}>📂 Seç</CyBtn>
+                  }}>{savePath || t('not_set')}</div>
+                  <CyBtn onClick={async () => { const f = await api?.selectFolder(); if(f) setSavePath(f) }}>📂 {t('select_folder')}</CyBtn>
                   <CyBtn onClick={() => savePath && api?.openFolder(savePath)}>↗</CyBtn>
                 </div>
               </SRow>
             </SGroup>
 
-            <SGroup title="FORMAT & KALİTE">
-              <SRow label="Varsayılan format" desc="MP4 veya MKV">
+            <SGroup title={t('section_format')}>
+              <SRow label={t('default_format')} desc={t('default_format_desc')}>
                 <div style={{ display:'flex', gap:6 }}>
                   {['mp4','mkv'].map(f => (
                     <button key={f} onClick={() => setFormat(f)}
@@ -143,19 +146,19 @@ export default function SettingsPage({ onSettingsChange }) {
                   ))}
                 </div>
               </SRow>
-              <SRow label="GPU Encode" desc="NVENC/AMF donanım encoder">
+              <SRow label={t('gpu_encode')} desc={t('gpu_encode_desc')}>
                 <Toggle value={gpu} onChange={setGpu} />
               </SRow>
             </SGroup>
           </div>
         )}
 
-        {/* YAYIN AYARLARI */}
+        {/* STREAMING SETTINGS */}
         {tab === 'stream' && (
           <div style={{ display:'flex', flexDirection:'column', gap:14, maxWidth:560 }}>
 
-            <SGroup title="YOUTUBE CANLI YAYIN">
-              <SRow label="Stream Key" desc="YouTube Studio → Canlı Yayın → Stream Key">
+            <SGroup title={t('section_youtube')}>
+              <SRow label={t('stream_key')} desc={t('stream_key_yt')}>
                 <div style={{ display:'flex', gap:6, flex:1 }}>
                   <input
                     type={showYt ? 'text' : 'password'}
@@ -177,8 +180,8 @@ export default function SettingsPage({ onSettingsChange }) {
               </SRow>
             </SGroup>
 
-            <SGroup title="TWITCH CANLI YAYIN">
-              <SRow label="Stream Key" desc="Twitch.tv → Dashboard → Ayarlar → Stream Key">
+            <SGroup title={t('section_twitch')}>
+              <SRow label={t('stream_key')} desc={t('stream_key_tw')}>
                 <div style={{ display:'flex', gap:6, flex:1 }}>
                   <input
                     type={showTw ? 'text' : 'password'}
@@ -193,7 +196,7 @@ export default function SettingsPage({ onSettingsChange }) {
                   <CyBtn onClick={() => setShowTw(!showTw)}>{showTw ? '🙈' : '👁'}</CyBtn>
                 </div>
               </SRow>
-              <SRow label="Twitch Sunucusu" desc="En yakın sunucuyu seç">
+              <SRow label={t('twitch_server')} desc="">
                 <select value={twServer} onChange={e => setTwServer(e.target.value)}
                   style={{
                     background:'rgba(0,0,0,0.5)',
@@ -208,8 +211,8 @@ export default function SettingsPage({ onSettingsChange }) {
               </SRow>
             </SGroup>
 
-            <SGroup title="YAYIN KALİTE AYARLARI">
-              <SRow label="Varsayılan platform" desc="">
+            <SGroup title={t('section_defaults')}>
+              <SRow label={t('default_platform')} desc="">
                 <div style={{ display:'flex', gap:6 }}>
                   {['youtube','twitch'].map(p => (
                     <button key={p} onClick={() => setDefPlatform(p)}
@@ -225,7 +228,7 @@ export default function SettingsPage({ onSettingsChange }) {
                   ))}
                 </div>
               </SRow>
-              <SRow label="Varsayılan bitrate" desc="kbps">
+              <SRow label={t('default_bitrate')} desc="kbps">
                 <select value={defBitrate} onChange={e => setDefBitrate(e.target.value)}
                   style={{
                     background:'rgba(0,0,0,0.5)',
@@ -238,7 +241,7 @@ export default function SettingsPage({ onSettingsChange }) {
                   ))}
                 </select>
               </SRow>
-              <SRow label="Varsayılan kalite" desc="">
+              <SRow label={t('default_quality')} desc="">
                 <select value={defQuality} onChange={e => setDefQuality(e.target.value)}
                   style={{
                     background:'rgba(0,0,0,0.5)',
@@ -251,45 +254,32 @@ export default function SettingsPage({ onSettingsChange }) {
                   ))}
                 </select>
               </SRow>
-              <SRow label="Düşük gecikme modu" desc="Twitch ultra-low latency">
+              <SRow label={t('low_latency')} desc="Twitch ultra-low latency">
                 <Toggle value={lowLatency} onChange={setLowLatency} />
               </SRow>
-              <SRow label="Yayınla birlikte kaydet" desc="Yerel MP4 kaydı da yap">
+              <SRow label={t('auto_record')} desc="Local MP4">
                 <Toggle value={autoRecord} onChange={setAutoRecord} />
               </SRow>
             </SGroup>
 
-            {/* Yardım kutusu */}
-            <div style={{
-              padding:12, borderRadius:8,
-              background:'rgba(0,200,255,0.04)',
-              border:'1px solid rgba(0,200,255,0.1)',
-              fontSize:10, color:'var(--text-dim)', lineHeight:1.6,
-            }}>
-              <div className="rb" style={{ fontFamily:'var(--font-display)', fontSize:8, letterSpacing:2, marginBottom:6 }}>
-                STREAM KEY NASIL ALINIR?
-              </div>
-              <div>🔴 YouTube: studio.youtube.com → Sol menü "Canlı Yayın" → Stream anahtarı</div>
-              <div style={{ marginTop:4 }}>🟣 Twitch: dashboard.twitch.tv → Ayarlar → Kanal → Birincil stream anahtarı</div>
-            </div>
           </div>
         )}
 
-        {/* SES AYARLARI */}
+        {/* AUDIO SETTINGS */}
         {tab === 'audio' && (
           <div style={{ display:'flex', flexDirection:'column', gap:14, maxWidth:560 }}>
-            <SGroup title="MİKROFON">
-              <SRow label="Mikrofon seviyesi" desc={`${micBoost}%`}>
+            <SGroup title={t('section_mic')}>
+              <SRow label={t('mic_boost')} desc={`${micBoost}%`}>
                 <input type="range" min="50" max="200" value={micBoost}
                   onChange={e => setMicBoost(Number(e.target.value))}
                   style={{ width:140, accentColor:'var(--cyan)' }} />
               </SRow>
-              <SRow label="Eko giderme" desc="Hoparlör sesini filtrele">
+              <SRow label={t('echo_cancel')} desc="">
                 <Toggle value={echoCancel} onChange={setEchoCancel} />
               </SRow>
             </SGroup>
-            <SGroup title="YAYIN SES BİTRATE">
-              <SRow label="Ses kalitesi" desc="Yayın için ses bitrate">
+            <SGroup title={t('section_processing')}>
+              <SRow label={t('audio')} desc="kbps">
                 <div style={{ display:'flex', gap:4 }}>
                   {['96','128','192','320'].map(b => (
                     <button key={b}
@@ -307,7 +297,41 @@ export default function SettingsPage({ onSettingsChange }) {
           </div>
         )}
 
-        {/* HAKKINDA */}
+        {/* LANGUAGE */}
+        {tab === 'language' && (
+          <div style={{ display:'flex', flexDirection:'column', gap:14, maxWidth:600 }}>
+            <SGroup title={t('language').toUpperCase()}>
+              <SRow label={t('language')} desc={t('language_desc')}>
+                <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:6, width:'100%' }}>
+                  {LANGUAGES.map(L => {
+                    const active = lang === L.id
+                    return (
+                      <button key={L.id} onClick={() => setLang(L.id)}
+                        className={active ? 'rb-border' : ''}
+                        style={{
+                          display:'flex', alignItems:'center', gap:10,
+                          padding:'10px 14px',
+                          background: active ? 'rgba(0,200,255,0.08)' : 'rgba(255,255,255,0.03)',
+                          border: active ? undefined : '1px solid rgba(255,255,255,0.06)',
+                          borderRadius:8,
+                          color: active ? 'var(--cyan)' : 'var(--text-dim)',
+                          fontSize:12, fontWeight: active ? 700 : 400,
+                          cursor:'pointer', transition:'all 0.15s',
+                          textAlign:'left',
+                        }}>
+                        <span style={{ fontSize:20 }}>{L.flag}</span>
+                        <span style={{ flex:1 }}>{L.label}</span>
+                        {active && <span>✓</span>}
+                      </button>
+                    )
+                  })}
+                </div>
+              </SRow>
+            </SGroup>
+          </div>
+        )}
+
+        {/* ABOUT / HAKKINDA */}
         {tab === 'about' && (
           <div style={{ display:'flex', flexDirection:'column', gap:16, maxWidth:480 }}>
             <div style={{
@@ -316,18 +340,18 @@ export default function SettingsPage({ onSettingsChange }) {
               border:'1px solid rgba(0,200,255,0.1)',
             }}>
               <div className="rb" style={{ fontFamily:'var(--font-display)', fontSize:18, letterSpacing:4, marginBottom:8 }}>
-                SHADOWREC PC
+                NOVAREC STUDIO
               </div>
               <div style={{ fontSize:12, color:'var(--text-dim)', marginBottom:4 }}>v1.0.0</div>
               <div style={{ fontSize:11, color:'var(--text-dim)', lineHeight:1.8 }}>
                 Electron + React + FFmpeg<br/>
-                Ekran kaydı · Video converter · Canlı yayın<br/>
-                YouTube · Twitch · Özel RTMP
+                Screen Recording · Video Converter · Live Streaming<br/>
+                YouTube · Twitch · Custom RTMP
               </div>
             </div>
-            <SGroup title="SİSTEM">
-              <SRow label="FFmpeg" desc="Video motoru">
-                <span style={{ fontSize:10, color:'var(--green)' }}>✓ Hazır</span>
+            <SGroup title="SYSTEM">
+              <SRow label="FFmpeg" desc="Video engine">
+                <span style={{ fontSize:10, color:'var(--green)' }}>✓ Ready</span>
               </SRow>
               <SRow label="GPU Encode" desc="NVENC/AMF">
                 <span style={{ fontSize:10, color:'var(--cyan)' }}>h264_nvenc</span>
@@ -337,8 +361,8 @@ export default function SettingsPage({ onSettingsChange }) {
         )}
       </div>
 
-      {/* Kaydet */}
-      {tab !== 'about' && (
+      {/* Save button */}
+      {tab !== 'about' && tab !== 'language' && (
         <div style={{ padding:'12px 20px', borderTop:'1px solid rgba(0,200,255,0.06)', flexShrink:0 }}>
           <button onClick={handleSave}
             className={saved ? '' : 'rb-border'}
@@ -352,7 +376,7 @@ export default function SettingsPage({ onSettingsChange }) {
               fontSize:11, fontWeight:700, letterSpacing:3,
               cursor:'pointer', transition:'all 0.3s',
             }}>
-            {saved ? '✅ KAYDEDİLDİ' : '💾 AYARLARI KAYDET'}
+            {saved ? '✅ ' + t('saved') : '💾 ' + t('save_settings')}
           </button>
         </div>
       )}
