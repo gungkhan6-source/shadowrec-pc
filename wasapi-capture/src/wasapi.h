@@ -4,22 +4,19 @@
 #include <audioclient.h>
 #include <vector>
 #include <cstdint>
-
 class WasapiCapture {
 public:
     WasapiCapture();
     ~WasapiCapture();
-
     bool Initialize();
     bool Start();
     void Stop();
     std::vector<uint8_t> GetData();
     void Cleanup();
-
     uint32_t GetSampleRate();
     uint32_t GetChannels();
     uint32_t GetBits();
-
+    bool GetIsFloat();   // ⭐ YENİ: format float mı (IEEE_FLOAT)
 private:
     IMMDeviceEnumerator *pEnumerator;
     IMMDevice           *pDevice;
@@ -29,4 +26,5 @@ private:
     uint32_t sampleRate;
     uint32_t channels;
     uint32_t bitsPerSample;
+    bool isFloat;        // ⭐ YENİ
 };

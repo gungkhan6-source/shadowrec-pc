@@ -575,6 +575,7 @@ async function startNativeCapture(options, event, isLiveMode, outputTarget) {
 
 // ── IPC: Kayıt başlat ────────────────────────────────────────────
 let gameCaptureLoop = null
+let gameAudioLoop = null
 let gameCaptureStopping = false
 
 function stopGameCapture() {
@@ -582,6 +583,15 @@ function stopGameCapture() {
   if (gameCaptureLoop) {
     clearInterval(gameCaptureLoop)
     gameCaptureLoop = null
+  }
+  if (gameAudioLoop) {
+    clearInterval(gameAudioLoop)
+    gameAudioLoop = null
+  }
+  // WASAPI sistem sesini durdur + temizle
+  if (wasapi) {
+    try { wasapi.stop() } catch(e){}
+    try { wasapi.cleanup() } catch(e){}
   }
   if (nativeCapture) {
     try { nativeCapture.gameCaptureStop() } catch(e){}
@@ -591,10 +601,11 @@ ipcMain.handle('start-game-recording', async (event, options) => {
   const {
     processName,
     fps = 60,
-    quality = '1080p',     // ⭐ YENİ: 720p / 1080p / 1440p / 4K / native
+    quality = '1080p',     // ⭐ 720p / 1080p / 1440p / 4K / native
     savePath,
     format = 'mp4',
-    bitrate
+    bitrate,
+    systemAudio = true,    // ⭐ YENİ: sistem sesi (WASAPI loopback) kaydet
   } = options
 
   if (!nativeCapture) {
@@ -769,42 +780,82 @@ ipcMain.handle('start-game-recording', async (event, options) => {
   
   const gop = targetFps * 2
   
-  // ⭐ Video filter chain — fps cap + scale + format
-  // fps=N filter: girişten N FPS'ye düşürür (fazla frame'leri atar, eksik olanları korur)
-  // Bu wallclock_as_timestamps ile birleşince gerçek-zamanlı hız sağlar
+  // ⭐ Video filter chain — scale + format (fps zaten -framerate ile sabit)
   const vfFilters = []
-  vfFilters.push(`fps=${targetFps}`)  // ⭐ ÖNCE fps cap (oyun 125 FPS verirse 60'a düşür)
   if (willScale) {
     vfFilters.push(`scale=${outW}:${outH}:flags=lanczos`)
   }
   vfFilters.push('format=yuv420p')
   
+  // ⭐ Ses kaynağı: WASAPI sistem sesi (loopback) varsa onu kullan, yoksa sessiz
+  // WASAPI başlat — sistem sesini yakala (oyun sesi dahil)
+  let wasapiActive = false
+  let wasapiInfo = null
+  if (systemAudio && wasapi) {
+    try {
+      wasapiInfo = wasapi.initialize()  // {sampleRate, channels, bits}
+      wasapi.start()
+      wasapiActive = true
+      console.log(`🔊 WASAPI sistem sesi: ${wasapiInfo.sampleRate}Hz, ${wasapiInfo.channels}ch, ${wasapiInfo.bits}bit`)
+    } catch (e) {
+      console.log('⚠️  WASAPI başlatılamadı, sessiz kayıt:', e.message)
+      wasapiActive = false
+    }
+  }
+
   const args = [ 
 
     '-y', '-hide_banner', '-loglevel', 'warning', '-stats',
-    '-use_wallclock_as_timestamps', '1',  // ⭐ Gerçek zamanlı timestamp (hız bozulmasını engeller)
+    // ⭐ Video: wallclock ile gerçek geliş zamanı (frame loop gerçekte kaç fps üretirse)
+    '-use_wallclock_as_timestamps', '1',
     '-f', 'rawvideo',
-    '-pixel_format', srcPixFmt,  // ⭐ Dinamik: bgra veya rgba
+    '-pixel_format', srcPixFmt,  // bgra veya rgba
     '-video_size', `${srcW}x${srcH}`,
-    '-framerate', String(targetFps),  // input hint (claim)
-    '-thread_queue_size', '4096',
+    '-thread_queue_size', '8192',
     '-i', 'pipe:0',
-    '-f', 'lavfi',
-    '-i', 'anullsrc=channel_layout=stereo:sample_rate=48000',
+  ]
+
+  // ⭐ Ses input: WASAPI (fd 3) veya sessiz anullsrc
+  if (wasapiActive) {
+    let pcmFormat = 's16le'
+    if (wasapiInfo.isFloat) {
+      pcmFormat = wasapiInfo.bits === 32 ? 'f32le' : 'f64le'
+    } else {
+      if (wasapiInfo.bits === 32) pcmFormat = 's32le'
+      else if (wasapiInfo.bits === 24) pcmFormat = 's24le'
+      else pcmFormat = 's16le'
+    }
+    console.log(`🔊 WASAPI PCM format: ${pcmFormat} (${wasapiInfo.bits}bit, float=${wasapiInfo.isFloat})`)
+    args.push(
+      // ⭐ Ses: wallclock YOK (WASAPI sıralı akıyor, aresample video'ya kilitler)
+      '-f', pcmFormat,
+      '-ar', String(wasapiInfo.sampleRate),
+      '-ac', String(wasapiInfo.channels),
+      '-thread_queue_size', '4096',
+      '-i', 'pipe:3',
+    )
+  } else {
+    args.push(
+      '-f', 'lavfi',
+      '-i', 'anullsrc=channel_layout=stereo:sample_rate=48000',
+    )
+  }
+
+  args.push(
     '-map', '0:v', '-map', '1:a',
     '-vf', vfFilters.join(','),
-  ]
+  )
 
   if (nvenc) {
     args.push(  
       '-c:v', 'h264_nvenc',
-      '-preset', 'p5', '-tune', 'hq', '-rc', 'cbr',
+      '-preset', 'p1', '-tune', 'll',
+      '-rc', 'cbr',
       '-b:v', `${kbps}k`, '-maxrate', `${kbps}k`, '-bufsize', `${kbps}k`,
-      '-profile:v', 'high', '-g', String(gop), '-bf', '2'
+      '-profile:v', 'high', '-g', String(gop)
     )
   } else {
     args.push(
-
       '-c:v', 'libx264', '-preset', 'veryfast', '-tune', 'zerolatency',
       '-b:v', `${kbps}k`, '-maxrate', `${kbps}k`, '-bufsize', `${kbps}k`,
       '-g', String(gop)
@@ -812,16 +863,27 @@ ipcMain.handle('start-game-recording', async (event, options) => {
   }
 
   args.push(
-    '-shortest',
     '-c:a', 'aac', '-b:a', '128k', '-ar', '48000', '-ac', '2',
+  )
+  // ⭐ Ses senkronu: aresample async=1 → sesi video saatine kilitler (drift'i sessizlik ekley/çıkararak düzeltir)
+  if (wasapiActive) {
+    args.push('-af', 'aresample=async=1')
+  }
+  args.push(
+    // ⭐ fps_mode cfr → video sabit çıktı FPS'i (wallclock'tan gelen gerçek tempoyu output FPS'e oturtur)
     '-fps_mode', 'cfr',
+    '-r', String(targetFps),
     '-movflags', '+faststart',
     filename
   )
   
-  console.log(`🎬 FFmpeg: ${srcW}x${srcH}${willScale ? ` → ${outW}x${outH} (${quality})` : ` (native)`} @ ${targetFps}fps, ${kbps}k, encoder=${nvenc ? 'nvenc' : 'x264'}`)
+  console.log(`🎬 FFmpeg: ${srcW}x${srcH}${willScale ? ` → ${outW}x${outH} (${quality})` : ` (native)`} @ ${targetFps}fps, ${kbps}k, encoder=${nvenc ? 'nvenc' : 'x264'}${wasapiActive ? ' +ses' : ''}`)
   
-  recordingProcess = spawn(ffmpegPath, args, { stdio: ['pipe', 'pipe', 'pipe'] })
+  // ⭐ stdio: video=stdin(fd0), stdout(fd1), stderr(fd2), audio=fd3 (WASAPI varsa pipe)
+  const stdioConfig = wasapiActive
+    ? ['pipe', 'pipe', 'pipe', 'pipe']  // fd3 = ses
+    : ['pipe', 'pipe', 'pipe']
+  recordingProcess = spawn(ffmpegPath, args, { stdio: stdioConfig })
   recordingOutput = filename
   	
   recordingProcess.stderr.on('data', (data) => {
@@ -844,33 +906,56 @@ ipcMain.handle('start-game-recording', async (event, options) => {
   })
   
   // 5. Frame loop — Native'den oku, FFmpeg'e pipe
+  // ⭐ Sadece YENİ frame yaz (lastBuffer tekrarı YOK!)
+  // Wallclock ile her frame gerçek zamanını alır. Aynı frame'i tekrar göndermek
+  // cfr ile çakışıp videoyu donduruyordu (494bin saat hatası). Eksik frame'leri
+  // FFmpeg cfr+wallclock ile kendi doldurur.
   gameCaptureStopping = false
-  let lastBuffer = null
   let frameCount = 0
+  let videoPaused = false
+  recordingProcess.stdin.on('drain', () => { videoPaused = false })
 
   gameCaptureLoop = setInterval(() => {
-    if (gameCaptureStopping || !recordingProcess || !recordingProcess.stdin.writable) {
-      return
+    if (gameCaptureStopping || !recordingProcess || !recordingProcess.stdin.writable || videoPaused) {
+      return  // pipe dolu → drain bekle (encoder yetişsin)
     }
     try {
       const result = nativeCapture.gameCaptureRead(0)  // bloklamadan
-      let bufferToWrite = null
-     
-      if (result.success) {
-        bufferToWrite = result.buffer
-        lastBuffer = result.buffer
-      } else if (lastBuffer) {
-        bufferToWrite = lastBuffer  // önceki frame'i tekrar gönder (FPS sabit kalsın)
-      }
-
-      if (bufferToWrite && !gameCaptureStopping) {
-        recordingProcess.stdin.write(bufferToWrite)
+      if (result.success && result.buffer && !gameCaptureStopping) {
+        const ok = recordingProcess.stdin.write(result.buffer)
+        if (!ok) videoPaused = true  // pipe dolu → backpressure
         frameCount++
       }
+      // ⭐ Yeni frame YOKSA hiçbir şey yazma (tekrar yok → donma yok, wallclock temiz)
     } catch(e) {
       // EPIPE vs sessiz geç
     }
   }, Math.floor(1000 / targetFps))
+  
+  // ⭐ 6. Audio loop — WASAPI sistem sesini oku, FFmpeg fd3'e yaz
+  if (wasapiActive) {
+    const audioStream = recordingProcess.stdio[3]  // fd3 = ses pipe
+    // Başlangıçta birikmiş buffer'ı temizle (gecikme önleme — video ilk frame ile senkron)
+    try { wasapi.getData() } catch(e){}
+    let audioPaused = false  // backpressure flag
+    audioStream.on('drain', () => { audioPaused = false })  // buffer boşaldı, devam
+    gameAudioLoop = setInterval(() => {
+      if (gameCaptureStopping || !audioStream || !audioStream.writable || audioPaused) {
+        // Pipe dolu (ENOBUFS önleme) → bu turu atla, drain bekle
+        if (!audioPaused) { try { wasapi.getData() } catch(e){} }  // veriyi oku ama yazma (birikmesin)
+        return
+      }
+      try {
+        const audioData = wasapi.getData()  // Buffer (PCM float/int)
+        if (audioData && audioData.length > 0) {
+          const ok = audioStream.write(audioData)
+          if (!ok) audioPaused = true  // buffer doldu, drain'e kadar dur
+        }
+      } catch(e) {
+        // EPIPE vs sessiz geç
+      }
+    }, 8)  // 8ms — denge: düşük gecikme + ENOBUFS riski az
+  }
   
   return {
     success: true,
@@ -1313,20 +1398,37 @@ ipcMain.handle('stop-recording', async () => {
     }
     proc.once('close', onClose)
 
-    // ⭐ ADIM 3: stdin'i nazikçe kapat (FFmpeg buffer'ı flushlasın ve MP4 footer yazsın)
+    // ⭐ ADIM 3: stdin (video) + fd3 (ses) pipe'larını nazikçe kapat
+    // FFmpeg tüm input'ları EOF görünce MP4 footer'ı yazar ve düzgün kapanır
     try {
-      proc.stdin.end()
+      // Önce ses pipe'ını kapat (fd3) — WASAPI varsa
+      if (proc.stdio && proc.stdio[3] && proc.stdio[3].writable) {
+        proc.stdio[3].end()
+      }
+    } catch (e) {
+      console.error('audio pipe (fd3) end hatası:', e.message)
+    }
+    try {
+      proc.stdin.end()  // video pipe (fd0)
     } catch (e) {
       console.error('stdin.end hatası:', e.message)
     }
 
-    // ⭐ ADIM 4: 10 saniye sonra hâlâ kapanmadıysa zorla kapat (MP4 büyükse finalize uzun sürebilir)
+    // ⭐ ADIM 4: 15 saniye sonra hâlâ kapanmadıysa zorla kapat
+    // Önce SIGINT dene (FFmpeg'e nazik dur sinyali — footer yazma şansı), sonra SIGKILL
     setTimeout(() => {
       if (!resolved && proc.exitCode === null) {
-        console.warn('⚠️ FFmpeg 10s\'de kapanmadı, SIGTERM gönderiliyor')
-        try { proc.kill('SIGTERM') } catch(e){}
+        console.warn('⚠️ FFmpeg 15s\'de kapanmadı, SIGINT gönderiliyor (nazik)')
+        try { proc.kill('SIGINT') } catch(e){}
+        // SIGINT'ten 3 sn sonra hâlâ açıksa SIGKILL
+        setTimeout(() => {
+          if (!resolved && proc.exitCode === null) {
+            console.warn('⚠️ Hâlâ kapanmadı, SIGKILL')
+            try { proc.kill('SIGKILL') } catch(e){}
+          }
+        }, 3000)
       }
-    }, 10000)
+    }, 15000)
   })
 })
 
